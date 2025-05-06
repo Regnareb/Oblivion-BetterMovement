@@ -1,13 +1,10 @@
 
 local sprint_start = 0
 local walk_start = 0
-local sneak_pressed = false
 local sneak_start = 0
-local sneak_state = false
 local gallop_start = 0
 local gallop_state = false
 local gallop_pressed = false
-
 local is_automoving = false
 
 
@@ -20,14 +17,25 @@ local is_automoving = false
 
 
 -- Known issues: 
--- - You have to have two key binds set for the "Hold Walk" to work (restart the game)
+-- - **You have to have two key binds set for the "Hold Walk" to work (restart the game)**
 -- - When automoving sprinting, it continues to sprint while exhausted
 -- - Automove on a Horse don't allow to Gallop yet
--- I tested A LOT of use cases but let me know if you encounter some weird things
+-- I tested a lot of use cases but let me know if you encounter some weird things
 
 
+-- You can configurate the mod to:
+-- - Deactivate the hold mode completely
+-- - Deactivate the automove sprint
+-- - When automove sprint is activated and you are sneaking/walking, either choose to stay in sneak/walk or force sprint
 
--- Extreme rare occurence bug: When sneaking and walking, then activate autorun and disable sneaking, the sneak state might be unsynced
+
+-- How To Install:
+-- - Install UE4SS
+-- - Copy the files to 
+-- - Add a second bind to the "Walk" keybind if you want to use "Hold Walk" mode
+
+-- VERSION 1.0
+
 
 config = require('config')
 local UEHelpers = require("UEHelpers")
@@ -59,17 +67,17 @@ local function StopSprint()
 end
 
 
-local function IsSneaking()
-    return playerController.Character.bIsCrouched
-end
+local function IsSneaking() return playerController.Character.bIsCrouched end
+local function IsSprinting() return playerCharacter.PairedPawnMovementComponent.IsSprinting() end
+local function IsRidingHorse() return playerController.IsHorseRiding() end
 
 
 RegisterHook("/Script/Altar.VEnhancedAltarPlayerController:ToggleSprint",
     function(ctx)
         -- GetPlayer() 
-        if not playerCharacter.PairedPawnMovementComponent:IsSprinting() then
+        if not IsSprinting() then
             sprint_start = os.clock()
-        elseif playerCharacter.PairedPawnMovementComponent:IsSprinting() and (os.clock() - sprint_start) > config.SPRINT_HOLD_TIME then
+        elseif IsSprinting() and (os.clock() - sprint_start) > config.SPRINT_HOLD_TIME then
             ctx.Self:DisableSprintToggle()
         end
     end
@@ -78,58 +86,17 @@ RegisterHook("/Script/Altar.VEnhancedAltarPlayerController:ToggleSprint",
 
 RegisterHook("/Script/Altar.VEnhancedAltarPlayerController:ToggleSneak",
     function(ctx)
-        -- print(pawn.CharacterStatePairingComponent)
-        -- print(pawn.CharacterStatePairingComponent.isSneaking))
-        sneak_pressed = not sneak_pressed
-            -- Hold Sneak       
-        if not is_automoving then
-            -- If already Toggle Sneaked and pressing Sneak to Hold
-            if sneak_pressed and sneak_state then 
-                ctx.Self:DisableSneakToggle()
-            -- Init for both modes
-            if sneak_pressed and sneak_start==0 then
-                sneak_state = true
-                sneak_start = os.clock()
-                return
-            -- Hold Sneak
-            elseif not sneak_pressed and (os.clock() - sneak_start) > config.SNEAK_HOLD_TIME then
-                ctx.Self:DisableSneakToggle()
-                sneak_start = 0
-                sneak_state = false
-                return
-            end
-            return
-
-        -- Toggle Automove Sneak
-        elseif is_automoving and (os.clock() - sneak_start) < config.SNEAK_HOLD_TIME then
-            if playerCharacter.PairedPawnMovementComponent.IsSprinting() then
-                ctx.Self:DisableSneakToggle()
-                sneak_start = 0
-                sneak_state = false
-            end
-
-
-            -- BUG
-
-            return
-        end
-        -- Hold Automove Sneak
-        if not playerCharacter.PairedPawnMovementComponent.IsSprinting() and playerController.IsWalking() then  --If both sneaking and walking
-            sneak_state = not sneak_state
-            if sneak_state then
-                sneak_start = os.clock()
-            else
-                sneak_start = 0
-            end
-        elseif not playerCharacter.PairedPawnMovementComponent.IsSprinting() then
-            sneak_start = 0
-            sneak_state = false
-            ctx.Self:DisableSneakToggle()
-            playerCharacter.PairedPawnMovementComponent:StartSprint()
-        elseif playerCharacter.PairedPawnMovementComponent:IsSprinting() then
-            sneak_state = true
+        -- if not is_automoving then
+        if not IsSneaking() then
             sneak_start = os.clock()
-            playerCharacter.PairedPawnMovementComponent:StopSprint()
+            if is_automoving and IsSprinting() then
+                playerCharacter.PairedPawnMovementComponent:StopSprint()
+            end
+        elseif IsSneaking() and (os.clock() - sneak_start) > config.SNEAK_HOLD_TIME then
+            ctx.Self:DisableSneakToggle()
+            if is_automoving and not playerController.IsWalking() then
+                playerCharacter.PairedPawnMovementComponent:StartSprint()
+            end
         end
     end
 )
@@ -137,30 +104,17 @@ RegisterHook("/Script/Altar.VEnhancedAltarPlayerController:ToggleSneak",
 
 RegisterHook("/Script/Altar.VEnhancedAltarPlayerController:ToggleWalk",
     function(ctx)
-        -- Hold Walk
-        if not is_automoving then
-            if not ctx.Self:isWalking() then
-                walk_start = os.clock()
-            elseif ctx.Self:isWalking() and (os.clock() - walk_start) > config.WALK_HOLD_TIME then
-                ctx.Self:DisableWalkToggle()
+        if not ctx.Self:isWalking() then
+            walk_start = os.clock()
+            if is_automoving and IsSprinting() then
+                playerCharacter.PairedPawnMovementComponent:StopSprint()
             end
-            return
-        -- Toggle Automove Walk
-        elseif is_automoving and (os.clock() - walk_start) < config.WALK_HOLD_TIME then
-            if playerCharacter.PairedPawnMovementComponent.IsSprinting() then
-                ctx.Self:DisableWalkToggle()
-            end
-            return
-        end
-        -- Hold Automove Walk
-        if not playerCharacter.PairedPawnMovementComponent.IsSprinting() and sneak_state then  --If both sneaking and walking
-        elseif not playerCharacter.PairedPawnMovementComponent.IsSprinting() then
+        elseif ctx.Self:isWalking() and (os.clock() - walk_start) > config.WALK_HOLD_TIME then
             ctx.Self:DisableWalkToggle()
-            playerCharacter.PairedPawnMovementComponent:StartSprint()
-        elseif playerCharacter.PairedPawnMovementComponent:IsSprinting() then
-            playerCharacter.PairedPawnMovementComponent:StopSprint()
+            if is_automoving and not IsSneaking() then
+                playerCharacter.PairedPawnMovementComponent:StartSprint()
+            end
         end
-        walk_start = os.clock()
     end
 )
 
@@ -183,26 +137,31 @@ RegisterHook("/Script/Altar.VEnhancedAltarPlayerController:ToggleGallop",
 )
 
 
+
 RegisterHook("/Script/Altar.VEnhancedAltarPlayerController:AutoMoveInput_Pressed", 
     function(ctx)
         is_automoving = not is_automoving
-        if (playerController.IsWalking() or sneak_state) and not config.force_automove_sprint then
-            return
-        end
-        if is_automoving and not (sneak_state or playerController.IsWalking() or playerCharacter.PairedPawnMovementComponent:IsSprinting()) then
-            playerCharacter.PairedPawnMovementComponent:StartSprint()
-        else 
-            playerCharacter.PairedPawnMovementComponent:StopSprint()
+        if config.automove_sprint then
+            if config.force_automove_sprint then
+                if playerController.IsWalking() then end
+                if IsSneaking() then pawn.SetSneak(false) end
+            end
+            print(config.force_automove_sprint)
+            if is_automoving and (config.force_automove_sprint or not (IsSneaking() or playerController.IsWalking() or IsSprinting())) then
+                playerCharacter.PairedPawnMovementComponent:StartSprint()
+            else 
+                playerCharacter.PairedPawnMovementComponent:StopSprint()
+            end
         end
     end
 )
 
 
 RegisterHook("/Script/Altar.VLevelChangeData:OnFadeToGameBeginEventReceived", function(context) GetPlayer() end)
+RegisterHook("/Script/Altar.VEnhancedAltarPlayerController:MovementForwardInput_Pressed", function(ctx) StopSprint() end)
+RegisterHook("/Script/Altar.VEnhancedAltarPlayerController:MovementBackwardInput_Pressed", function(ctx) StopSprint() end)
 RegisterHook("/Script/Altar.VEnhancedAltarPlayerController:MovementLeftInput_Pressed", function(ctx) StopSprint() end)
 RegisterHook("/Script/Altar.VEnhancedAltarPlayerController:MovementRightInput_Pressed", function(ctx) StopSprint() end)
-RegisterHook("/Script/Altar.VEnhancedAltarPlayerController:MovementBackwardInput_Pressed", function(ctx) StopSprint() end)
-RegisterHook("/Script/Altar.VEnhancedAltarPlayerController:MovementForwardInput_Pressed", function(ctx) StopSprint() end)
 RegisterHook("/Script/Altar.VEnhancedAltarPlayerController:ShiftKeyInput_Pressed", function(ctx) StopSprint() end)
 
 
