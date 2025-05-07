@@ -24,9 +24,9 @@ local is_automoving = false
 
 
 -- You can configurate the mod to:
--- - Deactivate the hold mode completely
--- - Deactivate the automove sprint
--- - When automove sprint is activated and you are sneaking/walking, either choose to stay in sneak/walk or force sprint
+-- - Set the time where the mode goes from toggle to hold, or deactivate the hold mode completely (0)
+-- - Deactivate the automove sprint alltogether (automove_sprint)
+-- - When automove sprint is activated and you are sneaking/walking, either choose to stay in sneak/walk or force sprint (force_automove_sprint)
 
 
 -- How To Install:
