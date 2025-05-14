@@ -27,23 +27,18 @@ local is_automoving = false
 -- - Set the time where the mode goes from toggle to hold, or deactivate the hold mode completely (0)
 -- - Deactivate the automove sprint alltogether (automove_sprint)
 -- - When automove sprint is activated and you are sneaking/walking, either choose to stay in sneak/walk or force sprint (force_automove_sprint)
-
+-- - Remove inertia when stopping (StopXXXXDuration)
 
 -- How To Install:
 -- - Install UE4SS
 -- - Copy the files to 
 -- - Add a second bind to the "Walk" keybind if you want to use "Hold Walk" mode
 
--- VERSION 1.0
+-- VERSION 1.1
 
 
 config = require('config')
 local UEHelpers = require("UEHelpers")
-local playerCharacter = FindFirstOf("VOblivionPlayerCharacter")
-local playerController = UEHelpers.GetPlayerController()
-local pawn = playerController.Pawn ---@cast pawn AVPairedPawn
-
-
 
 
 local function GetPlayer() 
@@ -56,6 +51,9 @@ local function GetPlayer()
     if not pawn or not pawn:IsValid() then
         pawn = playerController.Pawn ---@cast pawn AVPairedPawn
     end
+    pawn.CharacterMovement.StopRunDuration = config.StopRunDuration
+    pawn.CharacterMovement.StopWalkDuration = config.StopWalkDuration
+    pawn.CharacterMovement.StopSprintDuration = config.StopSprintDuration
 end
 
 
@@ -74,7 +72,6 @@ local function IsRidingHorse() return playerController.IsHorseRiding() end
 
 RegisterHook("/Script/Altar.VEnhancedAltarPlayerController:ToggleSprint",
     function(ctx)
-        -- GetPlayer() 
         if not IsSprinting() then
             sprint_start = os.clock()
         elseif IsSprinting() and (os.clock() - sprint_start) > config.SPRINT_HOLD_TIME then
@@ -86,7 +83,6 @@ RegisterHook("/Script/Altar.VEnhancedAltarPlayerController:ToggleSprint",
 
 RegisterHook("/Script/Altar.VEnhancedAltarPlayerController:ToggleSneak",
     function(ctx)
-        -- if not is_automoving then
         if not IsSneaking() then
             sneak_start = os.clock()
             if is_automoving and IsSprinting() then

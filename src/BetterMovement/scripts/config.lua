@@ -11,5 +11,10 @@ return {
     automove_sprint = true,
     -- If set to false and Walking/Sneaking, you will Autowalk/Autosneak
     -- If set to true, you will go from Walking/Sneaking to Autosprint
-    force_automove_sprint = false
+    force_automove_sprint = false,
+
+    -- The time your character takes to stop after releasing movement input (1 = 1 second for your character to stop)
+    StopWalkDuration = 0.125,
+    StopRunDuration = 0.2,
+    StopSprintDuration = 0.25
 }
